@@ -21,9 +21,6 @@ generateNGram <- function(corpus, level = 1) {
     freq <- data.frame(word = names(freq), freq = freq)
 }
 
-#monoGram <- generateNGram(dataCorpus, 1)
-#biGram <- generateNGram(dataCorpus, 2)
-#threeGram <- generateNGram(dataCorpus, 3)
 tetraGram <- generateNGram(dataCorpus, 4)
 # Split NGram in frequencies table
 tetraGramSplit <- within(tetraGram, word <- data.frame(do.call('rbind', strsplit(as.character(word), " ", fixed = T))))

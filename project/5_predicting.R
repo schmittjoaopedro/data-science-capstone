@@ -1,100 +1,160 @@
-library(stringi)
-library(R.utils)
-library(dplyr)
+SimpleGT <- function(table_N){
+    
+    table_N <- table(table_N$freq)
+    
+    SGT_DT <- data.frame(
+        r=as.numeric(names(table_N)),
+        n=as.vector(table_N),
+        Z=vector("numeric",length(table_N)), 
+        logr=vector("numeric",length(table_N)),
+        logZ=vector("numeric",length(table_N)),
+        r_star=vector("numeric",length(table_N)),
+        p=vector("numeric",length(table_N)))
+    
+    num_r <- nrow(SGT_DT)
+    for (j in 1:num_r) {
+        if(j == 1) {
+            r_i <- 0
+        } else {
+            r_i <- SGT_DT$r[j-1]
+        }
+        if(j == num_r) {
+            r_k <- SGT_DT$r[j]
+        } else {
+            r_k <- SGT_DT$r[j+1]
+        }
+        SGT_DT$Z[j] <- 2 * SGT_DT$n[j] / (r_k - r_i)
+    }
+    
+    SGT_DT$logr <- log(SGT_DT$r)
+    SGT_DT$logZ <- log(SGT_DT$Z)
+    linearFit <- lm(SGT_DT$logZ ~ SGT_DT$logr)
+    c0 <- linearFit$coefficients[1]
+    c1 <- linearFit$coefficients[2]
+    
+    use_y = FALSE
+    for (j in 1:(num_r-1)) {
+        r_plus_1 <- SGT_DT$r[j] + 1
+        
+        s_r_plus_1 <- exp(c0 + (c1 * SGT_DT$logr[j+1]))
+        s_r <- exp(c0 + (c1 * SGT_DT$logr[j]))
+        y <- r_plus_1 * s_r_plus_1/s_r
+        
+        if(use_y) {
+            SGT_DT$r_star[j] <- y
+        } else { 
+            n_r_plus_1 <- SGT_DT$n[SGT_DT$r == r_plus_1]
+            if(length(n_r_plus_1) == 0 ) {
+                SGT_DT$r_star[j] <- y
+                use_y = TRUE
+            } else {
+                n_r <- SGT_DT$n[j]
+                x<-(r_plus_1) * n_r_plus_1/n_r
+                if (abs(x-y) > 1.96 * sqrt(((r_plus_1)^2) * (n_r_plus_1/((n_r)^2))*(1+(n_r_plus_1/n_r)))) {
+                    SGT_DT$r_star[j] <- x
+                } else {
+                    SGT_DT$r_star[j] <- y
+                    use_y = TRUE
+                }
+            }
+        }
+        if(j==(num_r-1)) {
+            SGT_DT$r_star[j+1] <- y
+        }
+    }
+    N <- sum(SGT_DT$n * SGT_DT$r)
+    Nhat <- sum(SGT_DT$n * SGT_DT$r_star)
+    Po <- SGT_DT$n[1] / N
+    SGT_DT$p <- (1-Po) * SGT_DT$r_star/Nhat
+    
+    return(SGT_DT)
+}
 
-#prediction using interpolation, model extended with partial matches for 4-grams
-predict.interp <- function(model, t1, t2, t3) {
+predictNextWord <- function(testSentence, model, sgt, validResultsList=NULL) {
+    options("scipen"=100, "digits"=8)
+    testSentenceList <- unlist(strsplit(testSentence," "))
+    noOfWords <- length(testSentenceList)
+    
+    resultDF <- data.frame(word4 = factor(), probAdj = numeric())
+    
+    predictNGram(resultDF, "w1w2w3", sgt$w1w2w3, validResultsList,
+                 model$w1w2w3 %>% filter(word1 == testSentenceList[noOfWords-2], 
+                                         word2 == testSentenceList[noOfWords-1], 
+                                         word3 == testSentenceList[noOfWords]))
+    
+    predictNGram(resultDF, "w2w3", sgt$w2w3, validResultsList, 
+                 model$w2w3 %>% filter(word2 == testSentenceList[noOfWords-1], 
+                                       word3 == testSentenceList[noOfWords]))
+    
+    predictNGram(resultDF, "w3", sgt$w3, validResultsList, 
+                 model$w3 %>% filter(word3 == testSentenceList[noOfWords]))
+    
+    
+    predictNGram(resultDF, "w1w2", sgt$w1w2, validResultsList, 
+                 model$w1w2 %>% filter(word1 == testSentenceList[noOfWords-2], 
+                                       word2 == testSentenceList[noOfWords-1]))
+    
+    predictNGram(resultDF, "w1w3", sgt$w1w3, validResultsList, 
+                 model$w1w3 %>% filter(word1 == testSentenceList[noOfWords-2], 
+                                       word3 == testSentenceList[noOfWords]))
+    
+    predictNGram(resultDF, "w1", sgt$w1, validResultsList, 
+                 model$w1 %>% filter(word1 == testSentenceList[noOfWords-2]))
+    
+    return(resultDF %>% arrange(desc(probAdj)))
   
-  if(is.null(model$coef)) {
-    #coefficients for interpolation, default values, optimized for max likelihood
-    a123 = 0.33 * 0.35; a12 = 0.33 * 0.22;
-    a13 = 0.33 * 0.33; a1 = 0.33 * 0.1;
-    a23 = 0.33 * 1; a2 = 0.33 * 0; a3 = 0.32; a4 = 0.02
-  } else {
-    a123 <- model$coef$a123
-    a12 <- model$coef$a12
-    a13 <- model$coef$a13
-    a1 <- model$coef$a1
-    a2 <- model$coef$a2
-    a23 <- model$coef$a23
-    a3 <- model$coef$a3
-  }
-  
-  #search 4gram, full match
-  q123 <- model$w1w2w3 %>%
-          filter(word1 == t1, word2 == t2, word3 == t3) %>%
-          group_by(word4) %>%
-          mutate(probAdjusted = a123 * prob) %>%
-          as.data.frame()
-  
-  q12 <- model$w1w2 %>%
-    filter(word1 == t1, word2 == t2) %>%
-    group_by(word4) %>%
-    mutate(probAdjusted = a12 * prob) %>%
-    as.data.frame()
-  
-  q13 <- model$w1w3 %>%
-    filter(word1 == t1, word3 == t3) %>%
-    group_by(word4) %>%
-    mutate(probAdjusted = a13 * prob) %>%
-    as.data.frame()
-  
-  q1 <- model$w1 %>%
-    filter(word1 == t1) %>%
-    group_by(word4) %>%
-    mutate(probAdjusted = a1 * prob) %>%
-    as.data.frame()
-  
-  q23 <- model$w2w3 %>%
-    filter(word2 == t2, word3 == t3) %>%
-    group_by(word4) %>%
-    mutate(probAdjusted = a23 * prob) %>%
-    as.data.frame()
-  
-  q3 <- model$w3 %>%
-    filter(word3 == t3) %>%
-    group_by(word4) %>%
-    mutate(probAdjusted = a3 * prob) %>%
-    as.data.frame()
-  
-  q <- rbind(
-          q123[, c("word4","probAdjusted")], 
-          q12[, c("word4","probAdjusted")], 
-          q13[, c("word4","probAdjusted")], 
-          q1[, c("word4","probAdjusted")], 
-          q23[, c("word4","probAdjusted")], 
-          q3[, c("word4","probAdjusted")]) %>%
-        select(word4, probAdjusted) %>%
-        group_by(word4) %>%
-        summarise_each(funs(sum)) %>%
-        arrange(desc(probAdjusted)) %>%
-        as.data.frame()
-  
-  print(sum(is.na(q$word4)))
-  
-  if(sum(is.na(q$word4)) == 0) {
-    return (q[complete.cases(q),])
-  }
-  #last option, return the most frequent unigrams
-  if (t3 == "<S>") {
-    return (data.frame(word4 = "the", probAdjusted = 0))
-  }
-  return (data.frame(word4 = "and", probAdjusted = 0))
+}
+
+predictNGram <- function(resultDF, labelName, sgt, validResultsList, subGram) {
+    if(nrow(subGram) > 0 & !(nrow(resultDF) > 0)) {
+        print(labelName)
+        subGram$probAdj <- sapply(subGram$freq, FUN = function(x) sgt$p[sgt$r == x])
+        subGram <- subGram %>% select(word4, probAdj)
+        if(!is.null(validResultsList) & nrow(subGram) > 0) {
+            subGram <- subGram %>% filter(word4 %in% validResultsList)
+        }
+        eval.parent(substitute(resultDF <- subGram))
+    }
 }
 
 
-nextWord <- function(model, phrase, specificWordsToFind = c()) {
-  words <- strsplit(phrase, " ")[[1]]
-  t1 <- ""
-  t2 <- ""
-  t3 <- ""
-  if(length(words) > 0) t1 <- words[1]
-  if(length(words) > 1) t2 <- words[2]
-  if(length(words) > 2) t3 <- words[3]
-  predicted <- predict.interp(model, t1, t2, t3)
-  if(length(specificWordsToFind) == 0) {
-    return(predicted)
-  } else {
-    predicted %>% filter(word4 %in% specificWordsToFind) %>% arrange(desc(probAdjusted)) %>% as.data.frame()
-  }
+cleanSentence <- function(testSentence) {
+    testSentence <- stripWhitespace(testSentence)
+    testSentence <- tolower(testSentence)
+    testSentence <- removeNumbers(testSentence)
+    testSentence <- removePunctuation(testSentence, preserve_intra_word_dashes = TRUE)
+  return(testSentence)
+}
+
+
+sgt <- list()
+sgt$w1w2w3 <- SimpleGT(model$w1w2w3)
+sgt$w2w3 <- SimpleGT(model$w2w3)
+sgt$w3 <- SimpleGT(model$w3)
+sgt$w1w3 <- SimpleGT(model$w1w3)
+sgt$w1w2 <- SimpleGT(model$w1w2)
+sgt$w1 <- SimpleGT(model$w1)
+sgt$w2 <- SimpleGT(model$w2)
+sgt$w4 <- SimpleGT(model$w4)
+
+predictWord <- function(sentence) {
+    sentence <- cleanSentence(sentence)
+    sentenceList <- unlist(strsplit(sentence," "))
+    noOfWords <- length(sentenceList)
+    if(noOfWords >= 3) {
+        return(predictNextWord(paste(
+            sentenceList[noOfWords-2], 
+            sentenceList[noOfWords-1], 
+            sentenceList[noOfWords]), model, sgt))
+    } else if(noOfWords == 2) {
+        return(predictNextWord(paste(
+            "-", 
+            sentenceList[noOfWords-1], 
+            sentenceList[noOfWords]), model, sgt))
+    } else if(noOfWords == 1) {
+        return(predictNextWord(paste(
+            "-", 
+            "-", 
+            sentenceList[noOfWords]), model, sgt))
+    }
 }
