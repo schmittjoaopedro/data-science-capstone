@@ -1,17 +1,32 @@
-SimpleGT <- function(table_N){
+library(dplyr)
+library(tm)
+library(SnowballC)
+library(cldr)
+
+data_clean_dir <- "data/clean"
+data_sgt_file <- "sgt_model"
+data_model_file <- "data_model"
+data_predictor <- "predictor_api"
+
+# Thanks!
+#
+# http://www.grsampson.net/D_SGT.c 
+# https://github.com/dxrodri/datasciencecoursera/blob/master/SwiftKeyCapstone/predictFunctions.r
+calculateSimpleGoodTuring <- function(model){
     
-    table_N <- table(table_N$freq)
+    freqTable <- table(model$freq)
     
     SGT_DT <- data.frame(
-        r=as.numeric(names(table_N)),
-        n=as.vector(table_N),
-        Z=vector("numeric",length(table_N)), 
-        logr=vector("numeric",length(table_N)),
-        logZ=vector("numeric",length(table_N)),
-        r_star=vector("numeric",length(table_N)),
-        p=vector("numeric",length(table_N)))
+        r=as.numeric(names(freqTable)),
+        n=as.vector(freqTable),
+        Z=vector("numeric",length(freqTable)), 
+        logr=vector("numeric",length(freqTable)),
+        logZ=vector("numeric",length(freqTable)),
+        r_star=vector("numeric",length(freqTable)),
+        p=vector("numeric",length(freqTable)))
     
     num_r <- nrow(SGT_DT)
+
     for (j in 1:num_r) {
         if(j == 1) {
             r_i <- 0
@@ -71,7 +86,9 @@ SimpleGT <- function(table_N){
 }
 
 predictNextWord <- function(testSentence, model, sgt, validResultsList=NULL) {
+    
     options("scipen"=100, "digits"=8)
+    
     testSentenceList <- unlist(strsplit(testSentence," "))
     noOfWords <- length(testSentenceList)
     
@@ -107,7 +124,7 @@ predictNextWord <- function(testSentence, model, sgt, validResultsList=NULL) {
 
 predictNGram <- function(resultDF, labelName, sgt, validResultsList, subGram) {
     if(nrow(subGram) > 0 & !(nrow(resultDF) > 0)) {
-        print(labelName)
+        #print(labelName)
         subGram$probAdj <- sapply(subGram$freq, FUN = function(x) sgt$p[sgt$r == x])
         subGram <- subGram %>% select(word4, probAdj)
         if(!is.null(validResultsList) & nrow(subGram) > 0) {
@@ -126,17 +143,6 @@ cleanSentence <- function(testSentence) {
   return(testSentence)
 }
 
-
-sgt <- list()
-sgt$w1w2w3 <- SimpleGT(model$w1w2w3)
-sgt$w2w3 <- SimpleGT(model$w2w3)
-sgt$w3 <- SimpleGT(model$w3)
-sgt$w1w3 <- SimpleGT(model$w1w3)
-sgt$w1w2 <- SimpleGT(model$w1w2)
-sgt$w1 <- SimpleGT(model$w1)
-sgt$w2 <- SimpleGT(model$w2)
-sgt$w4 <- SimpleGT(model$w4)
-
 predictWord <- function(sentence) {
     sentence <- cleanSentence(sentence)
     sentenceList <- unlist(strsplit(sentence," "))
@@ -145,16 +151,39 @@ predictWord <- function(sentence) {
         return(predictNextWord(paste(
             sentenceList[noOfWords-2], 
             sentenceList[noOfWords-1], 
-            sentenceList[noOfWords]), model, sgt))
+            sentenceList[noOfWords]), predictor.model, predictor.sgt))
     } else if(noOfWords == 2) {
         return(predictNextWord(paste(
             "-", 
             sentenceList[noOfWords-1], 
-            sentenceList[noOfWords]), model, sgt))
+            sentenceList[noOfWords]), predictor.model, predictor.sgt))
     } else if(noOfWords == 1) {
         return(predictNextWord(paste(
             "-", 
             "-", 
-            sentenceList[noOfWords]), model, sgt))
+            sentenceList[noOfWords]), predictor.model, predictor.sgt))
     }
 }
+
+variables <- ls()
+if(sum(variables == "model") == 0) {
+    model <- readRDS(sprintf("%s/%s.rds", data_clean_dir, data_model_file))
+    variables <- ls()
+}
+
+sgt <- list()
+sgt$w1w2w3 <- calculateSimpleGoodTuring(model$w1w2w3)
+sgt$w2w3 <- calculateSimpleGoodTuring(model$w2w3)
+sgt$w3 <- calculateSimpleGoodTuring(model$w3)
+sgt$w1w3 <- calculateSimpleGoodTuring(model$w1w3)
+sgt$w1w2 <- calculateSimpleGoodTuring(model$w1w2)
+sgt$w1 <- calculateSimpleGoodTuring(model$w1)
+sgt$w2 <- calculateSimpleGoodTuring(model$w2)
+sgt$w4 <- calculateSimpleGoodTuring(model$w4)
+
+saveRDS(object = sgt, file = sprintf("%s/%s.rds", data_clean_dir, data_sgt_file))
+
+predictor <- list()
+predictor.model <- model
+predictor.sgt <- sgt
+predictor.predictWord <- predictWord
