@@ -10,6 +10,8 @@ data_predictor <- "predictor_api"
 
 # Thanks!
 #
+# http://www.grsampson.net/RGoodTur.html
+# http://www.grsampson.net/AGtf1.html
 # http://www.grsampson.net/D_SGT.c 
 # https://github.com/dxrodri/datasciencecoursera/blob/master/SwiftKeyCapstone/predictFunctions.r
 calculateSimpleGoodTuring <- function(model){
