@@ -1,0 +1,15 @@
+References
+
+
+http://www.jmlr.org/papers/volume12/collobert11a/collobert11a.pdf
+https://cran.r-project.org/web/packages/markovchain/vignettes/an_introduction_to_markovchain_package.pdf
+http://www.cs.upc.edu/~robert/teaching/estadistica/rprogramming.pdf
+https://lagunita.stanford.edu/c4x/Engineering/CS-224N/asset/slp4.pdf
+https://pdfs.semanticscholar.org/37c4/095eb7fc4cfdb6c0218ce260c5125ce1e2ce.pdf
+http://www.grsampson.net/RGoodTur.html
+http://www.grsampson.net/AGtf1.html
+http://www.grsampson.net/D_SGT.c
+https://github.com/dxrodri/datasciencecoursera/blob/master/SwiftKeyCapstone/predictFunctions.r
+https://cran.r-project.org/web/views/NaturalLanguageProcessing.html
+https://github.com/vruizext/text-prediction-R
+https://github.com/dxrodri/datasciencecoursera/blob/master/SwiftKeyCapstone/Quiz3_V2.r

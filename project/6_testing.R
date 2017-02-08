@@ -57,6 +57,6 @@ for(source in c("blogs", "news", "twitter")) {
                   round((rightWords / totalWords) * 100, 2)))
 }
 
-#[1] "Predicted for blogs in 90 documents with 20.49 of accuracy."
-#[1] "Predicted for news in 102 documents with 20.33 of accuracy."
-#[1] "Predicted for twitter in 237 documents with 21.47 of accuracy.
+#[1] Predicted for blogs in 90 documents with 21.68 of accuracy.
+#[1] Predicted for news in 102 documents with 21.63 of accuracy.
+#[1] Predicted for twitter in 237 documents with 21.47 of accuracy.
