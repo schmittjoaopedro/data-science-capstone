@@ -22,7 +22,7 @@ shinyUI(fluidPage(
             p("João Pedro Schmitt"),
             h3("Project"),
             p("A better explanation can be found at this link: ", a("RPubs", href = "http://rpubs.com/schmittjoaopedro/247738", target="_blank")),
-            p("A brief presentation can be found at: ", a("Slide deck", href = "http://rpubs.com/schmittjoaopedro/248102", target="_blank")),
+            p("A brief presentation can be found at: ", a("Slide deck", href = "http://rpubs.com/schmittjoaopedro/248125", target="_blank")),
             p("The full source code can be found at the following link: ", a("Github repository", href = "https://github.com/schmittjoaopedro/data-science-capstone/tree/master/project", target="_blank"))
         )
     ),
